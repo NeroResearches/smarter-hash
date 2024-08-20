@@ -1,72 +1,64 @@
-use std::hash;
-
 use indexmap::{IndexMap, IndexSet};
 
-use crate::{utils::hash_sum, StableHash};
+use crate::{write_seq_symm, StableHash};
 
-impl<K: StableHash, V: StableHash, S> StableHash for IndexMap<K, V, S> {
+impl<K, V, S> StableHash for IndexMap<K, V, S>
+where
+    K: StableHash,
+    V: StableHash,
+{
+    #[inline]
     fn stable_hash<H>(&self, hasher: &mut H)
     where
-        H: hash::Hasher + Default,
+        H: crate::StableHasher,
     {
-        hash_sum(
-            self.iter(),
-            |(k, v), h| {
-                k.stable_hash(h);
-                v.stable_hash(h);
-            },
-            hasher,
-        );
+        write_seq_symm(self.iter(), hasher);
     }
 }
-impl<T: StableHash, S> StableHash for IndexSet<T, S> {
+
+impl<T, S> StableHash for IndexSet<T, S>
+where
+    T: StableHash,
+{
     fn stable_hash<H>(&self, hasher: &mut H)
     where
-        H: hash::Hasher + Default,
+        H: crate::StableHasher,
     {
-        hash_sum(self.iter(), |item, h| item.stable_hash(h), hasher);
+        write_seq_symm(self.iter(), hasher);
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::fmt;
+    use std::hash::DefaultHasher;
 
     use indexmap::{IndexMap, IndexSet};
 
-    use crate::utils::compute_hash;
-
-    #[track_caller]
-    fn order_not_equal<T>(lhs: impl Iterator<Item = T>, rhs: impl Iterator<Item = T>)
-    where
-        T: PartialEq + fmt::Debug,
-    {
-        let lhs: Vec<T> = lhs.collect();
-        let rhs: Vec<T> = rhs.collect();
-
-        assert_ne!(lhs, rhs);
-    }
+    use crate::{compute_hash, utils::assert_ne};
 
     #[test]
-    fn index_set_order_does_not_matter() {
-        let one: IndexSet<i32> = IndexSet::from_iter([100, 200, 300]);
-        let two: IndexSet<i32> = IndexSet::from_iter([300, 200, 100]);
+    fn indexset_order_does_not_matter() {
+        let lhs: IndexSet<&str> = ["Hello", "World", "!"].into_iter().collect();
+        let rhs: IndexSet<&str> = ["World", "!", "Hello"].into_iter().collect();
 
-        order_not_equal(one.iter().copied(), two.iter().copied());
+        assert_ne(lhs.iter(), rhs.iter());
 
-        assert_eq!(compute_hash(one), compute_hash(two));
-    }
-
-    #[test]
-    fn index_map_order_does_not_matter() {
-        let one: IndexMap<i32, i32> = IndexMap::from_iter([(100, 0), (200, 1), (300, 2)]);
-        let two: IndexMap<i32, i32> = IndexMap::from_iter([(300, 2), (200, 1), (100, 0)]);
-
-        order_not_equal(
-            one.iter().map(|(k, v)| (*k, *v)),
-            two.iter().map(|(k, v)| (*k, *v)),
+        assert_eq!(
+            compute_hash::<_, DefaultHasher>(lhs),
+            compute_hash::<_, DefaultHasher>(rhs),
         );
+    }
 
-        assert_eq!(compute_hash(one), compute_hash(two));
+    #[test]
+    fn indexmap_order_does_not_matter() {
+        let lhs: IndexMap<&str, &str> = [("Hello", "World"), ("Lol", "Kek")].into_iter().collect();
+        let rhs: IndexMap<&str, &str> = [("Lol", "Kek"), ("Hello", "World")].into_iter().collect();
+
+        assert_ne(lhs.iter(), rhs.iter());
+
+        assert_eq!(
+            compute_hash::<_, DefaultHasher>(lhs),
+            compute_hash::<_, DefaultHasher>(rhs)
+        );
     }
 }

@@ -1,30 +1,44 @@
-use std::{hash, rc::Rc, sync::Arc};
+use std::{rc::Rc, sync::Arc};
 
 use crate::StableHash;
 
-impl<T: StableHash + ?Sized> StableHash for Rc<T> {
+macro_rules! boxed {
+    ($($boxed:ident)*) => {
+        $(
+            impl<T> StableHash for $boxed<T>
+            where
+                T: StableHash + ?Sized,
+            {
+                #[inline]
+                fn stable_hash<H>(&self, hasher: &mut H)
+                where
+                    H: crate::StableHasher,
+                {
+                    <T as StableHash>::stable_hash(&*self, hasher);
+                }
+            }
+        )*
+    };
+}
+
+impl<'a, T: StableHash + ?Sized> StableHash for &'a mut T {
+    #[inline]
     fn stable_hash<H>(&self, hasher: &mut H)
     where
-        H: hash::Hasher + Default,
+        H: crate::StableHasher,
     {
-        <T as StableHash>::stable_hash(&*self, hasher)
+        <T as StableHash>::stable_hash(&*self, hasher);
     }
 }
 
-impl<T: StableHash + ?Sized> StableHash for Arc<T> {
+impl<'a, T: StableHash + ?Sized> StableHash for &'a T {
+    #[inline]
     fn stable_hash<H>(&self, hasher: &mut H)
     where
-        H: hash::Hasher + Default,
+        H: crate::StableHasher,
     {
-        <T as StableHash>::stable_hash(&*self, hasher)
+        <T as StableHash>::stable_hash(self, hasher);
     }
 }
 
-impl<T: StableHash + ?Sized> StableHash for Box<T> {
-    fn stable_hash<H>(&self, hasher: &mut H)
-    where
-        H: hash::Hasher + Default,
-    {
-        <T as StableHash>::stable_hash(&*self, hasher)
-    }
-}
+boxed!(Box Arc Rc);

@@ -1,5 +1,5 @@
 [package]
-name = "more-stable-hash"
+name = "symmetric-hash"
 version = "0.1.0"
 edition = "2021"
 
@@ -11,5 +11,4 @@ serde = { version = "1.0.208", default-features = false, optional = true }
 [features]
 default = ["compact_str", "indexmap"]
 compact_str = ["dep:compact_str"]
-serde = ["dep:serde"]
 indexmap = ["dep:indexmap"]
